@@ -79,7 +79,7 @@ class Smpl(Ch):
 
         self.A, A_global = self._global_rigid_transformation()
         self.Jtr = ch.vstack([g[:3, 3] for g in A_global])
-        self.J_transformed = self.Jtr + self.trans.reshape((1, 3))
+        self.J_transformed = self.Jtr + self.trans.reshape((1, 3))    # joints in the world
 
         self.V = self.A.dot(self.weights.T)
 

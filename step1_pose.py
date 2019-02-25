@@ -13,7 +13,7 @@ from opendr.lighting import LambertianPointLight
 from opendr.renderer import ColoredRenderer
 from opendr.filters import gaussian_pyramid
 
-from util import im
+# from util import im
 from util.logger import log
 from lib.frame import FrameData
 from models.smpl import Smpl, copy_smpl, joints_coco
@@ -36,7 +36,8 @@ def get_cb(viz_rn, f):
             for j in f.keypoints[:, :2]:
                 cv2.circle(debug, tuple(j.astype(np.int)), 3, (0, 0.8, 0), -1)
 
-            im.show(debug, id='pose', waittime=1)
+            #im.show(debug, id='pose', waittime=1)
+            cv2.imshow('debug', debug)
     else:
         cb = None
 
@@ -372,6 +373,17 @@ if __name__ == '__main__':
         help="Enable visualization")
 
     args = parser.parse_args()
+
+    # ############## debug
+    from opendr.filters import GaussPyrDownOne
+    im = ch.Ch(np.random.rand(64, 64))
+    im_pyr = GaussPyrDownOne(px=im, im_shape=(64, 64))
+    im_pyr.compute_dr_wrt(im)
+
+    ch.minimize({'pyr': im_pyr}, x0=[im])
+
+    # #debug done
+
 
     main(args.keypoint_file, args.masks_file, args.camera, args.out, args.model, args.prior, args.resize,
          args.body_height, args.nohands, args.display)

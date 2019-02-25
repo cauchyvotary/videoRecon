@@ -11,7 +11,8 @@ from opendr.camera import ProjectPoints
 from opendr.renderer import BoundaryRenderer, ColoredRenderer
 from tqdm import tqdm
 
-from util import im, mesh
+#from util import im, mesh
+from util import mesh
 from util.logger import log
 from lib.frame import setup_frame_rays
 from lib.rays import ray_objective
@@ -32,7 +33,8 @@ def get_cb(frame, base_smpl, camera, frustum):
 
     def cb(_):
         silh_diff = (rn.r - viz_mask + 1) / 2.
-        im.show(silh_diff, waittime=1)
+        #im.show(silh_diff, waittime=1)
+
 
     return cb
 

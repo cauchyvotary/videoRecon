@@ -26,7 +26,7 @@ parser.add_argument('target', type=str)
 args = parser.parse_args()
 
 out_file = args.target
-mask_dir = args.src
+mask_dir = args.src_folder
 mask_files = sorted(glob(os.path.join(mask_dir, '*.png')) + glob(os.path.join(mask_dir, '*.jpg')))
 
 with h5py.File(out_file, 'w') as f:
