@@ -41,8 +41,23 @@ def setup_frame_rays(base_smpl, camera, camera_t, camera_rt, pose, trans, mask):
 
     base_smpl.pose[:] = f.pose
     camera.t[:] = f.trans
-
-    f.Vi = batch_invert(base_smpl.V.r)
+    f.base_smpl = base_smpl
+    f.Vi = batch_invert(base_smpl.V.r) # invert the global transformation
     f.rays = rays_from_silh(f.mask, camera)
-
     return f
+
+
+def setup_frame_smpl(base_smpl, camera, camera_t, camera_rt, pose, trans, mask):
+    f = FrameData()
+
+    f.trans, f.pose = model_params_in_camera_coords(trans, pose, base_smpl.J[0], camera_t, camera_rt)
+    f.mask = mask
+
+    base_smpl.pose[:] = f.pose
+    camera.t[:] = f.trans
+
+    f.base_smpl = base_smpl
+    return f
+
+
+

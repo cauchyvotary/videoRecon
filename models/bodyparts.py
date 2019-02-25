@@ -11,7 +11,7 @@ def get_bodypart_vertex_ids():
     global _cache
 
     if _cache is None:
-        with open('assets/bodyparts.pkl', 'rb') as fp:
+        with open('/home/suoxin/Body/videoavatars/assets/bodyparts.pkl', 'rb') as fp:
             _cache = pkl.load(fp)
 
     return _cache

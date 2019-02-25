@@ -13,7 +13,7 @@ from opendr.lighting import LambertianPointLight
 from opendr.renderer import ColoredRenderer
 from opendr.filters import gaussian_pyramid
 
-# from util import im
+from util import im
 from util.logger import log
 from lib.frame import FrameData
 from models.smpl import Smpl, copy_smpl, joints_coco
@@ -36,8 +36,7 @@ def get_cb(viz_rn, f):
             for j in f.keypoints[:, :2]:
                 cv2.circle(debug, tuple(j.astype(np.int)), 3, (0, 0.8, 0), -1)
 
-            #im.show(debug, id='pose', waittime=1)
-            cv2.imshow('debug', debug)
+            im.show(debug, id='pose', waittime=1)
     else:
         cb = None
 
@@ -58,6 +57,7 @@ def pose_prior_obj(smpl, prior_data):
 def height_predictor(b2m, betas):
     return ch.hstack((betas.reshape(1, -1), [[1]])).dot(b2m)
 
+# pose_obj is joints projection error
 
 def init(frames, body_height, b2m, viz_rn):
     betas = frames[0].smpl.betas
@@ -100,7 +100,6 @@ def init(frames, body_height, b2m, viz_rn):
     )
 
     E_betas = betas - betas.r
-
     for w_prior, w_betas in weights:
         x0 = [betas]
 
@@ -116,7 +115,7 @@ def init(frames, body_height, b2m, viz_rn):
                 x0.extend([f.smpl.pose[range(21) + range(27, 30) + range(36, 60)], f.smpl.trans])
                 E['pose_{}'.format(i)] = f.pose_obj
                 E['prior_{}'.format(i)] = f.pose_prior_obj * w_prior
-
+        print()
         ch.minimize(
             E,
             x0,
@@ -129,18 +128,20 @@ def init(frames, body_height, b2m, viz_rn):
 
 
 def reinit_frame(frame, null_pose, nohands, viz_rn):
-
-    if (np.sum(frame.pose_obj.r ** 2) > 625 or np.sum(frame.pose_prior_obj.r ** 2) > 75)\
+    print('fit direction')
+    if (np.sum(frame.pose_obj.r ** 2) > 4000 or np.sum(frame.pose_prior_obj.r ** 2) > 65)\
             and np.sum(frame.keypoints[[0, 2, 5, 8, 11], 2]) > 3.:
-
+        print('reinit', np.sum(frame.pose_obj.r ** 2))
         log.info('Tracking error too large. Re-init frame...')
 
         x0 = [frame.smpl.pose[:3], frame.smpl.trans]
 
         frame.smpl.pose[3:] = null_pose
+
         if frame.keypoints[2, 0] > frame.keypoints[5, 0]:
             frame.smpl.pose[0] = 0
             frame.smpl.pose[2] = np.pi
+
 
         E = {
             'init_pose': frame.pose_obj[[0, 2, 5, 8, 11]],
@@ -227,30 +228,31 @@ def fit_pose(frame, last_smpl, frustum, nohands, viz_rn):
 def main(keypoint_file, masks_file, camera_file, out, model_file, prior_file, resize,
          body_height, nohands, display):
 
-    # load data
+    # load smpl model
     with open(model_file, 'rb') as fp:
         model_data = pkl.load(fp)
-
+# camera file
     with open(camera_file, 'rb') as fp:
         camera_data = pkl.load(fp)
-
+#a pose prior file
     with open(prior_file, 'rb') as fp:
         prior_data = pkl.load(fp)
-
     if 'basicModel_f' in model_file:
-        regs = np.load('vendor/smplify/models/regressors_locked_normalized_female.npz')
-        b2m = np.load('assets/b2m_f.npy')
+        regs = np.load('/home/suoxin/Body/videoavatars/vendor/smplify/models/regressors_locked_normalized_female.npz')
+        b2m = np.load('/home/suoxin/Body/videoavatars/assets/b2m_f.npy')
     else:
-        regs = np.load('vendor/smplify/models/regressors_locked_normalized_male.npz')
-        b2m = np.load('assets/b2m_m.npy')
+        regs = np.load('/home/suoxin/Body/videoavatars/vendor/smplify/models/regressors_locked_normalized_male.npz')
+        b2m = np.load('/home/suoxin/Body/videoavatars/assets/b2m_m.npy')
 
+# load key point file mask file masks including many frames
     keypoints = h5py.File(keypoint_file, 'r')['keypoints']
+    print(keypoints.shape)
     masks = h5py.File(masks_file, 'r')['masks']
     num_frames = masks.shape[0]
 
-    # init
+    # init smpl
     base_smpl = Smpl(model_data)
-    base_smpl.trans[:] = np.array([0, 0, 3])
+    base_smpl.trans[:] = np.array([0, 0, 10])
     base_smpl.pose[0] = np.pi
     base_smpl.pose[3:] = prior_data['mean']
 
@@ -300,6 +302,7 @@ def main(keypoint_file, masks_file, camera_file, out, model_file, prior_file, re
 
     init(init_frames, body_height, b2m, debug_rn)
 
+    print('12345')
     # get pose frame by frame
     with h5py.File(out, 'w') as fp:
         last_smpl = None
@@ -324,66 +327,74 @@ def main(keypoint_file, masks_file, camera_file, out, model_file, prior_file, re
 
             if i == 0:
                 betas_dset[:] = current_frame.smpl.betas.r
-
             last_smpl = current_frame.smpl
 
     log.info('Done.')
 
 
-if __name__ == '__main__':
+    '''
     parser = argparse.ArgumentParser()
-
+	#key points file .hdf5
     parser.add_argument(
         'keypoint_file',
         type=str,
         help="File that contains 2D keypoint detections")
+    # mask file
     parser.add_argument(
         'masks_file',
         type=str,
         help="File that contains segmentations")
+    # camera file pkl
     parser.add_argument(
         'camera',
         type=str,
         help="pkl file that contains camera settings")
+    #out file
     parser.add_argument(
         'out',
         type=str,
         help="Out file path")
+    # smpl model file
     parser.add_argument(
         '--model', '-m',
         default='vendor/smpl/models/basicmodel_m_lbs_10_207_0_v1.0.0.pkl',
         help='Path to SMPL model')
+    # a pose prior file
     parser.add_argument(
         '--prior', '-p',
         default='assets/prior_a_pose.pkl',
         help='Path to pose prior')
+    # resize factor
     parser.add_argument(
         '--resize', '-r', default=0.5, type=float,
         help="Resize factor")
+    # body height
     parser.add_argument(
         '--body_height', '-bh', default=None, type=float,
         help="Height of the subject in meters (optional)")
+    # with hands
     parser.add_argument(
         '--nohands', '-nh',
         action='store_true',
         help="Exclude hands from optimization")
+    # display
     parser.add_argument(
         '--display', '-d',
         action='store_true',
         help="Enable visualization")
 
     args = parser.parse_args()
-
-    # ############## debug
-    from opendr.filters import GaussPyrDownOne
-    im = ch.Ch(np.random.rand(64, 64))
-    im_pyr = GaussPyrDownOne(px=im, im_shape=(64, 64))
-    im_pyr.compute_dr_wrt(im)
-
-    ch.minimize({'pyr': im_pyr}, x0=[im])
-
-    # #debug done
-
-
     main(args.keypoint_file, args.masks_file, args.camera, args.out, args.model, args.prior, args.resize,
          args.body_height, args.nohands, args.display)
+    '''
+
+keypoint_file = '/home/suoxin/Body/obj1/joints/joints.hdf5'
+masks_file = '/home/suoxin/Body/obj1/mask/masks.hdf5'
+camera = '/home/suoxin/Body/obj1/result2/camera.pkl'
+out = '/home/suoxin/Body/obj1/result2/reconstructed_poses.hdf5'
+model = '/home/suoxin/Body/videoavatars/vendor/smpl/models/basicmodel_m_lbs_10_207_0_v1.0.0.pkl'
+prior = '/home/suoxin/Body/videoavatars/assets/prior_a_pose.pkl'
+resize = 1.0
+print(123)
+main(keypoint_file, masks_file, camera, out, model, prior, resize, None, True, True)
+

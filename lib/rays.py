@@ -69,7 +69,7 @@ def rays_from_points(points, camera):
 
     return np.hstack((np.repeat(c0.reshape(1, 1, 3), points3d.shape[0], axis=0), points3d.reshape(-1, 1, 3)))
 
-
+# find contours and rays
 def rays_from_silh(mask, camera):
 
     if cv2.__version__[0] == '2':
@@ -89,11 +89,16 @@ def rays_from_silh(mask, camera):
 
 
 def ray_objective(f, sigma, base_smpl, camera, vis_rn_b, vis_rn_m):
+
     base_smpl.pose[:] = f.pose
     camera.t[:] = f.trans
 
     f.v_ids, f.rays_u = unpose_and_select_rays(f.rays, f.Vi, base_smpl, vis_rn_b, vis_rn_m)
+
     f.verts = base_smpl.v_shaped_personal[f.v_ids]
+
     f.dist = distance_function(f.rays_u, f.verts)
 
     return GMOf(f.dist, sigma)
+
+

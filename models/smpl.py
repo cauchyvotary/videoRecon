@@ -10,7 +10,7 @@ from vendor.smpl.posemapper import posemap, Rodrigues
 from vendor.smpl.serialization import backwards_compatibility_replacements
 
 
-VERT_NOSE = 331
+VERT_NOSE = 411
 VERT_EAR_L = 3485
 VERT_EAR_R = 6880
 VERT_EYE_L = 2802
@@ -20,6 +20,9 @@ VERT_EYE_R = 6262
 class Smpl(Ch):
     """
     Class to store SMPL object with slightly improved code and access to more matrices
+    self.trans is the tranlation
+    self.V is the rotation of every vertex
+
     """
     terms = 'model',
     dterms = 'trans', 'betas', 'pose', 'v_personal'
@@ -49,10 +52,10 @@ class Smpl(Ch):
                 if (s in dd) and not hasattr(dd[s], 'dterms'):
                     dd[s] = ch.array(dd[s])
 
-            self.f = dd['f']
+            self.f = dd['f']  # faces
             self.v_template = dd['v_template']
             if not hasattr(self, 'v_personal'):
-                self.v_personal = ch.zeros_like(self.v_template)
+                self.v_personal = ch.zeros_like(self.v_template)  #
             self.shapedirs = dd['shapedirs']
             self.J_regressor = dd['J_regressor']
             if 'J_regressor_prior' in dd:
@@ -79,7 +82,7 @@ class Smpl(Ch):
 
         self.A, A_global = self._global_rigid_transformation()
         self.Jtr = ch.vstack([g[:3, 3] for g in A_global])
-        self.J_transformed = self.Jtr + self.trans.reshape((1, 3))    # joints in the world
+        self.J_transformed = self.Jtr + self.trans.reshape((1, 3))
 
         self.V = self.A.dot(self.weights.T)
 
@@ -131,7 +134,7 @@ def copy_smpl(smpl, model):
 
     return new
 
-
+# return joints of cocos dataset
 def joints_coco(smpl):
     J = smpl.J_transformed
     nose = smpl[VERT_NOSE]
@@ -145,23 +148,29 @@ def joints_coco(smpl):
 
     return ch.vstack((
         nose,
-        neck,
-        2.1 * (J[14] - shoulders_m) + neck,
-        J[[19, 21]],
-        2.1 * (J[13] - shoulders_m) + neck,
-        J[[18, 20]],
-        J[2] + 0.38 * (J[2] - J[1]),
-        J[[5, 8]],
-        J[1] + 0.38 * (J[1] - J[2]),
-        J[[4, 7]],
-        eye_r,
-        eye_l,
-        ear_r,
-        ear_l,
+        J[12],
+        J[17],
+        J[19],
+        J[21],
+        J[16],
+        J[18],
+        J[20],
+        J[2],
+        J[5],
+        J[8],
+        J[1],
+        J[4],
+        J[7]
+        #eye_r,
+        #eye_l,
+        #ear_r,
+        #ear_l,
     ))
 
 
+# transform model parameters to the camera coordinate
 def model_params_in_camera_coords(trans, pose, J0, camera_t, camera_rt):
+
     root = Rodrigues(np.matmul(Rodrigues(camera_rt).r, Rodrigues(pose[:3]).r)).r.reshape(-1)
     pose[:3] = root
 
@@ -171,9 +180,9 @@ def model_params_in_camera_coords(trans, pose, J0, camera_t, camera_rt):
 
 
 if __name__ == '__main__':
-    smpl = Smpl(model='../vendor/smpl/models/basicModel_f_lbs_10_207_0_v1.0.0.pkl')
-    smpl.pose[:] = np.random.randn(72) * .2
-    smpl.pose[0] = np.pi
+    smpl = Smpl(model='/home/suoxin/Body/videoavatars/vendor/smpl/models/basicmodel_m_lbs_10_207_0_v1.0.0.pkl')
+
+    print(smpl.show_tree())
     # smpl.v_personal[:] = np.random.randn(*smpl.shape) / 500.
 
     # render test
@@ -182,15 +191,17 @@ if __name__ == '__main__':
     from opendr.lighting import LambertianPointLight
 
     rn = ColoredRenderer()
-
     # Assign attributes to renderer
     w, h = (640, 480)
-
     rn.camera = ProjectPoints(v=smpl, rt=np.zeros(3), t=np.array([0, 0, 3.]), f=np.array([w, w]),
                               c=np.array([w, h]) / 2., k=np.zeros(5))
+
     rn.frustum = {'near': 1., 'far': 10., 'width': w, 'height': h}
+
     rn.set(v=smpl, f=smpl.f, bgcolor=np.zeros(3))
 
+    smpl.pose[:] = np.random.randn(72) * .2
+    smpl.pose[0] = np.pi
     # Construct point light source
     rn.vc = LambertianPointLight(
         f=smpl.f,

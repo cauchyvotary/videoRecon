@@ -12,7 +12,6 @@ def visible_boundary_edges(rn_b, rn_m):
     silh = rn_m.r
     sobelx = cv2.Sobel(silh, cv2.CV_64F, 1, 0, ksize=3)
     sobely = cv2.Sobel(silh, cv2.CV_64F, 0, 1, ksize=3)
-
     mag = (sobelx ** 2 + sobely ** 2) > 0
 
     visibility[mag == 0] = 4294967295
@@ -20,7 +19,7 @@ def visible_boundary_edges(rn_b, rn_m):
 
     return np.unique(visibility.ravel()[visible])
 
-
+# boundary vertices
 def visible_boundary_edge_verts(rn_b, rn_m):
     visible_edge_ids = visible_boundary_edges(rn_b, rn_m)
 

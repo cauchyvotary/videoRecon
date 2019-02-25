@@ -11,8 +11,7 @@ from opendr.camera import ProjectPoints
 from opendr.renderer import BoundaryRenderer, ColoredRenderer
 from tqdm import tqdm
 
-#from util import im, mesh
-from util import mesh
+from util import im, mesh
 from util.logger import log
 from lib.frame import setup_frame_rays
 from lib.rays import ray_objective
@@ -27,14 +26,12 @@ def get_cb(frame, base_smpl, camera, frustum):
     base_smpl.pose[:] = frame.pose
     camera.t[:] = frame.trans
     camera.rt[:] = 0
-
     rn = ColoredRenderer(camera=camera, v=base_smpl, f=base_smpl.f, vc=np.ones_like(base_smpl),
                          frustum=frustum, bgcolor=0, num_channels=1)
 
     def cb(_):
         silh_diff = (rn.r - viz_mask + 1) / 2.
-        #im.show(silh_diff, waittime=1)
-
+        im.show(silh_diff, waittime=1)
 
     return cb
 
@@ -95,28 +92,30 @@ def fit_consensus(frames, base_smpl, camera, frustum, model_data, nohands, icp_c
 def main(pose_file, masks_file, camera_file, out, obj_out, num, icp_count, model_file, first_frame, last_frame,
          nohands, naked, display):
 
-    # load data
+    # load SMPL model data
     with open(model_file, 'rb') as fp:
         model_data = pkl.load(fp)
 
+    # load camera para
     with open(camera_file, 'rb') as fp:
         camera_data = pkl.load(fp)
-
+    # load frame pose
     pose_data = h5py.File(pose_file, 'r')
-    poses = pose_data['pose'][first_frame:last_frame]
-    trans = pose_data['trans'][first_frame:last_frame]
-    masks = h5py.File(masks_file, 'r')['masks'][first_frame:last_frame]
-    num_frames = masks.shape[0]
+    poses = pose_data['pose'][first_frame:last_frame+1]
+    trans = pose_data['trans'][first_frame:last_frame+1]
+    masks = h5py.File(masks_file, 'r')['masks'][first_frame:last_frame+1]
+
+    num_frames = masks.shape[0]-1
 
     indices_consensus = np.ceil(np.arange(num) * num_frames * 1. / num).astype(np.int)
-
+    print('indices_consensus', indices_consensus)
     # init
     base_smpl = Smpl(model_data)
     base_smpl.betas[:] = np.array(pose_data['betas'], dtype=np.float32)
 
     camera = ProjectPoints(t=np.zeros(3), rt=np.zeros(3), c=camera_data['camera_c'],
                            f=camera_data['camera_f'], k=camera_data['camera_k'], v=base_smpl)
-    camera_t = camera_data['camera_t']
+    camera_t = np.zeros(3)
     camera_rt = camera_data['camera_rt']
     frustum = {'near': 0.1, 'far': 1000., 'width': int(camera_data['width']), 'height': int(camera_data['height'])}
     frames = []
@@ -142,13 +141,13 @@ def main(pose_file, masks_file, camera_file, out, obj_out, num, icp_count, model
 
     if obj_out is not None:
         base_smpl.pose[:] = 0
-        vt = np.load('assets/basicModel_vt.npy')
-        ft = np.load('assets/basicModel_ft.npy')
+        vt = np.load('/home/suoxin/Body/videoavatars/assets/basicModel_vt.npy')
+        ft = np.load('/home/suoxin/Body/videoavatars/assets/basicModel_ft.npy')
         mesh.write(obj_out, base_smpl.r, base_smpl.f, vt=vt, ft=ft)
 
     log.info('Done.')
 
-
+'''
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -204,3 +203,20 @@ if __name__ == '__main__':
 
     main(args.pose_file, args.masks_file, args.camera, args.out, args.obj_out, args.num, args.icp, args.model,
          args.first_frame, args.last_frame, args.nohands, args.naked, args.display)
+'''
+pose_file = '/home/suoxin/Body/obj1/result2/reconstructed_poses.hdf5'
+masks_file = '/home/suoxin/Body/obj1/mask/masks.hdf5'
+camera = '/home/suoxin/Body/obj1/result2/camera.pkl'
+out = '/home/suoxin/Body/obj1/result2/betas.pkl'
+obj_out = '/home/suoxin/Body/obj1/result2/mesh.obj'
+model = '/home/suoxin/Body/videoavatars/vendor/smpl/models/basicmodel_m_lbs_10_207_0_v1.0.0.pkl'
+num = 30
+icp = 5
+first_frame = 0
+last_frame = 29
+nohands = True
+naked= False
+display = True
+
+main(pose_file, masks_file, camera, out, obj_out, num, icp, model,
+     first_frame, last_frame, nohands, naked, display)

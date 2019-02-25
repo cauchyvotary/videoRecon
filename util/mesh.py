@@ -5,6 +5,8 @@ import os
 import numpy as np
 
 
+
+
 def write(filename, v, f, vt=None, ft=None, vn=None, vc=None, texture=None):
     with open(filename, 'w') as fp:
         if texture is not None:

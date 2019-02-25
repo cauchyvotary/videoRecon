@@ -28,16 +28,17 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
 
     with open(consensus_file, 'rb') as fp:
         consensus_data = pkl.load(fp)
-
+    #print('camera_data',np.array(camera_data['camera_t']))
     pose_data = h5py.File(pose_file, 'r')
     poses = pose_data['pose'][first_frame:last_frame]
     trans = pose_data['trans'][first_frame:last_frame]
     masks = h5py.File(masks_file, 'r')['masks'][first_frame:last_frame]
-    num_frames = masks.shape[0]
+    videos = h5py.File(video_file, 'r')['masks'][first_frame:last_frame]
+    num_frames = masks.shape[0]-1
     indices_texture = np.ceil(np.arange(num) * num_frames * 1. / num).astype(np.int)
 
-    vt = np.load('assets/basicModel_vt.npy')
-    ft = np.load('assets/basicModel_ft.npy')
+    vt = np.load('/home/suoxin/Body/videoavatars/assets/basicModel_vt.npy')
+    ft = np.load('/home/suoxin/Body/videoavatars/assets/basicModel_ft.npy')
 
     # init
     base_smpl = Smpl(model_data)
@@ -47,14 +48,16 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
     bgcolor = np.array([1., 0.2, 1.])
     iso = Isomapper(vt, ft, base_smpl.f, resolution, bgcolor=bgcolor)
     iso_vis = IsoColoredRenderer(vt, ft, base_smpl.f, resolution)
-    camera = ProjectPoints(t=camera_data['camera_t'], rt=camera_data['camera_rt'], c=camera_data['camera_c'],
+
+    camera = ProjectPoints(t=np.zeros(3), rt=camera_data['camera_rt'], c=camera_data['camera_c'],
                            f=camera_data['camera_f'], k=camera_data['camera_k'], v=base_smpl)
     frustum = {'near': 0.1, 'far': 1000., 'width': int(camera_data['width']), 'height': int(camera_data['height'])}
     rn_vis = ColoredRenderer(f=base_smpl.f, frustum=frustum, camera=camera, num_channels=1)
 
-    cap = cv2.VideoCapture(video_file)
-    for _ in range(first_frame):
-        cap.grab()
+
+    #cap = cv2.VideoCapture(video_file)
+    #for _ in range(first_frame):
+    #    cap.grab()
 
     # get part-textures
     i = first_frame
@@ -66,10 +69,11 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
     vn = VertNormals(f=base_smpl.f, v=base_smpl)
     static_indices = np.indices((resolution, resolution))
 
-    while cap.isOpened() and i < indices_texture[-1]:
+    #while cap.isOpened() and i < indices_texture[-1]:
+    for i in indices_texture:
         if i in indices_texture:
             log.info('Getting part texture from frame {}...'.format(i))
-            _, frame = cap.read()
+            frame = videos[i]
 
             mask = np.array(masks[i], dtype=np.uint8)
             pose_i = np.array(poses[i], dtype=np.float32)
@@ -80,6 +84,7 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
 
             # which faces have been seen and are projected into the silhouette?
             visibility = rn_vis.visibility_image.ravel()
+
             visible = np.nonzero(visibility != 4294967295)[0]
 
             proj = camera.r
@@ -87,7 +92,8 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
                 np.logical_and(np.round(camera.r[:, 0]) >= 0, np.round(camera.r[:, 0]) < frustum['width']),
                 np.logical_and(np.round(camera.r[:, 1]) >= 0, np.round(camera.r[:, 1]) < frustum['height']),
             )
-            in_mask = np.zeros(camera.shape[0], dtype=np.bool)
+
+            in_mask = np.zeros(camera.shape[0], dtype=np.bool) # vertex
             idx = np.round(proj[in_viewport][:, [1, 0]].T).astype(np.int).tolist()
             in_mask[in_viewport] = mask[idx]
 
@@ -109,8 +115,7 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
             # texels to consider
             part_mask = np.zeros((resolution, resolution))
             min_normal = np.min(normal_agg, axis=2)
-            part_mask[iso_normals > min_normal] = 1.
-
+            part_mask[iso_normals > 0] = 1.
             # update best seen texels
             where = np.argmax(np.atleast_3d(iso_normals) - normal_agg, axis=2)
 
@@ -121,8 +126,8 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
             if display:
                 im.show(part_tex, id='part_tex', waittime=1)
 
-        else:
-            cap.grab()
+        #else:
+            #cap.grab()
 
         i += 1
 
@@ -145,7 +150,7 @@ def main(consensus_file, camera_file, video_file, pose_file, masks_file, out, mo
     cv2.imwrite(out, tex_final)
     log.info('Done.')
 
-
+'''
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -198,3 +203,19 @@ if __name__ == '__main__':
 
     main(args.consensus, args.camera, args.video, args.pose_file, args.masks_file, args.out, args.model,
          args.resolution, args.num, args.first_frame, args.last_frame, args.display)
+'''
+consensus = '/home/suoxin/Body/data/chenxin/result30/betas.pkl'
+camera = '/home/suoxin/Body/data/chenxin/camera.pkl'
+video = '/home/suoxin/Body/data/chenxin/image30/image.hdf5'
+pose_file = '/home/suoxin/Body/data/chenxin/result30/reconstructed_poses.hdf5'
+masks_file = '/home/suoxin/Body/data/chenxin/mask30/masks.hdf5'
+out = '/home/suoxin/Body/data/chenxin/result30/texture.png'
+model = '/home/suoxin/Body/videoavatars/vendor/smpl/models/basicmodel_m_lbs_10_207_0_v1.0.0.pkl'
+resolution = 1024
+num = 30
+first_frame = 0
+last_frame = 30
+display = True
+main(consensus, camera, video, pose_file, masks_file, out, model, resolution, num, first_frame, last_frame, display)
+
+
