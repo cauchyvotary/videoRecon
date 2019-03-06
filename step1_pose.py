@@ -374,15 +374,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # ############## debug
-    from opendr.filters import GaussPyrDownOne
-    im = ch.Ch(np.random.rand(64, 64))
-    im_pyr = GaussPyrDownOne(px=im, im_shape=(64, 64))
-    im_pyr.compute_dr_wrt(im)
-
-    ch.minimize({'pyr': im_pyr}, x0=[im])
-
-    # #debug done
+    # # ############## debug
+    # from opendr.filters import GaussPyrDownOne
+    # im = ch.Ch(np.random.rand(64, 64))
+    # im_pyr = GaussPyrDownOne(px=im, im_shape=(64, 64))
+    # im_pyr.compute_dr_wrt(im)
+    #
+    # ch.minimize({'pyr': im_pyr}, x0=[im])
+    #
+    # # #debug done
 
 
     main(args.keypoint_file, args.masks_file, args.camera, args.out, args.model, args.prior, args.resize,
